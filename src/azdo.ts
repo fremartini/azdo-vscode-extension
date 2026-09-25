@@ -157,7 +157,7 @@ function toStatus(pr: AzdoPullRequest): models.PullRequestStatus {
 /**
  * Re-fetches the status of every tracked pull request and updates the store
  * (which refreshes the UI). Failures leave the old status and are reported
- * in the result.
+ * in the result. 
  */
 export async function refreshPullRequestStatuses(
   store: PullRequestStore,
