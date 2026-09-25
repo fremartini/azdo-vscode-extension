@@ -33,13 +33,13 @@
     "viewsWelcome": [
       {
         "view": "azdoMonitor.pullRequests",
-        "contents": "No pull requests are being tracked. Add entries to data/pullRequests.json to see them here.\n[Refresh](command:azdo-monitor.refreshPullRequests)"
+        "contents": "No pull requests are being tracked.\n[Register Pull Request](command:azdo-monitor.registerPullRequest)"
       }
     ],
     "menus": {
       "view/title": [
         {
-          "command": "azdo-monitor.refreshPullRequests",
+          "command": "azdo-monitor.registerPullRequest",
           "when": "view == azdoMonitor.pullRequests",
           "group": "navigation"
         }
@@ -47,13 +47,9 @@
     },
     "commands": [
       {
-        "command": "azdo-monitor.refreshPullRequests",
-        "title": "Refresh Pull Requests",
-        "icon": "$(refresh)"
-      },
-      {
         "command": "azdo-monitor.registerPullRequest",
-        "title": "Register Pull Request"
+        "title": "Register Pull Request",
+        "icon": "$(add)"
       },
       {
         "command": "azdo-monitor.unregisterPullRequest",

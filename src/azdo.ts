@@ -42,7 +42,9 @@ export async function registerPullRequest(
     return status.error;
   }
 
-  return null;
+  const added = store.add({ ...azDoUrl, Status: status.value });
+  const label = `${azDoUrl.Repository} #${azDoUrl.Id}`;
+  return added ? `Now tracking ${label}` : `${label} is already tracked`;
 }
 
 export async function unregisterPullRequest(
@@ -55,7 +57,10 @@ export async function unregisterPullRequest(
     return "Invalid Azure DevOps format";
   }
 
-  return null;
+  const label = `${azDoUrl.Repository} #${azDoUrl.Id}`;
+  return store.remove(azDoUrl)
+    ? `Stopped tracking ${label}`
+    : `${label} is not tracked`;
 }
 
 const PAT = "";
@@ -90,12 +95,39 @@ async function getRepositories(
   return { ok: true, value: repositories.value };
 }
 
+/** Subset of the Azure DevOps GitPullRequest response that we use. */
+interface AzdoPullRequest {
+  reviewers?: { vote: number }[];
+}
+
+/**
+ * Collapses reviewer votes into one status, most blocking first.
+ * Azure DevOps votes: 10 approved, 5 approved with suggestions,
+ * 0 no vote, -5 waiting for author, -10 rejected.
+ */
+function toStatus(pr: AzdoPullRequest): models.PullRequestStatus {
+  const votes = (pr.reviewers ?? []).map((r) => r.vote);
+  if (votes.includes(-10)) {
+    return "Rejected";
+  }
+  if (votes.includes(-5)) {
+    return "WaitingForAuthor";
+  }
+  if (votes.includes(10)) {
+    return "Approved";
+  }
+  if (votes.includes(5)) {
+    return "ApprovedWithSuggestions";
+  }
+  return "NoReview";
+}
+
 async function getPullRequestStatus(
   organization: string,
   project: string,
   repositoryId: string,
   pullrequestId: string,
-): Promise<Result<models.PullRequest, string>> {
+): Promise<Result<models.PullRequestStatus, string>> {
   const url = `https://dev.azure.com/${organization}/${project}/_apis/git/repositories/${repositoryId}/pullrequests/${pullrequestId}?api-version=7.1`;
 
   const response = await fetch(url, {
@@ -114,7 +146,7 @@ async function getPullRequestStatus(
 
   return {
     ok: true,
-    value: (await response.json()) as models.PullRequest,
+    value: toStatus((await response.json()) as AzdoPullRequest),
   };
 }
 

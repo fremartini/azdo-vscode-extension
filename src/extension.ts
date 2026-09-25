@@ -8,7 +8,7 @@ import { PullRequestTreeProvider } from "./views/pullRequestTreeProvider";
 // This method is called when your extension is activated
 // Your extension is activated the very first time the command is executed
 export async function activate(context: vscode.ExtensionContext) {
-  const pullRequestStore = initPullRequestStore(context.extensionUri);
+  const pullRequestStore = initPullRequestStore();
   const pullRequestTreeProvider = new PullRequestTreeProvider(pullRequestStore);
   const pullRequestTreeView = vscode.window.createTreeView(
     "azdoMonitor.pullRequests",
@@ -22,16 +22,10 @@ export async function activate(context: vscode.ExtensionContext) {
   };
   pullRequestStore.onDidChange(updateBadge);
 
-  const refreshPullRequests = vscode.commands.registerCommand(
-    "azdo-monitor.refreshPullRequests",
-    () => pullRequestStore.load(),
-  );
-
   context.subscriptions.push(
     pullRequestStore,
     pullRequestTreeProvider,
     pullRequestTreeView,
-    refreshPullRequests,
   );
 
   // The command has been defined in the package.json file
@@ -80,8 +74,6 @@ export async function activate(context: vscode.ExtensionContext) {
   );
 
   context.subscriptions.push(registerPullRequest, unregisterPullRequest);
-
-  await pullRequestStore.load();
 }
 
 // This method is called when your extension is deactivated
