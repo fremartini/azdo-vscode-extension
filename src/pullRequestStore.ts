@@ -31,10 +31,12 @@ export class PullRequestStore implements vscode.Disposable {
     return this.pullRequests;
   }
 
-  set(pullRequests: PullRequest[]): void {
-    this.pullRequests = pullRequests;
+  /** Replaces the tracked pull requests and refreshes the UI. */
+  set(pullRequests: readonly PullRequest[]): void {
+    this.pullRequests = [...pullRequests];
     this.changeEmitter.fire();
   }
+
   async load(): Promise<void> {
     let raw: unknown;
     try {
@@ -67,6 +69,25 @@ export class PullRequestStore implements vscode.Disposable {
     this.watcher.dispose();
     this.changeEmitter.dispose();
   }
+}
+
+let sharedStore: PullRequestStore | undefined;
+
+/** Creates the store the UI is bound to. Called once from `activate()`. */
+export function initPullRequestStore(extensionUri: vscode.Uri): PullRequestStore {
+  sharedStore = new PullRequestStore(extensionUri);
+  return sharedStore;
+}
+
+/**
+ * Returns the store the UI is bound to. Use this rather than constructing a
+ * new `PullRequestStore`, otherwise `set()` won't reach the tree view.
+ */
+export function getPullRequestStore(): PullRequestStore {
+  if (!sharedStore) {
+    throw new Error("PullRequestStore is not initialised; the extension has not activated yet.");
+  }
+  return sharedStore;
 }
 
 function isPullRequest(value: unknown): value is PullRequest {

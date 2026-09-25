@@ -2,13 +2,13 @@
 // Import the module and reference it with the alias vscode in your code below
 import * as vscode from "vscode";
 import * as azdo from "./azdo";
-import { PullRequestStore } from "./pullRequestStore";
+import { initPullRequestStore } from "./pullRequestStore";
 import { PullRequestTreeProvider } from "./views/pullRequestTreeProvider";
 
 // This method is called when your extension is activated
 // Your extension is activated the very first time the command is executed
 export async function activate(context: vscode.ExtensionContext) {
-  const pullRequestStore = new PullRequestStore(context.extensionUri);
+  const pullRequestStore = initPullRequestStore(context.extensionUri);
   const pullRequestTreeProvider = new PullRequestTreeProvider(pullRequestStore);
   const pullRequestTreeView = vscode.window.createTreeView(
     "azdoMonitor.pullRequests",
