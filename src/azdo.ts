@@ -122,20 +122,67 @@ function toStatus(pr: AzdoPullRequest): models.PullRequestStatus {
   return "NoReview";
 }
 
+/**
+ * Re-fetches the status of every tracked pull request and updates the store
+ * (which refreshes the UI). Failures are logged and leave the old status.
+ */
+export async function refreshPullRequestStatuses(
+  store: PullRequestStore,
+): Promise<void> {
+  await Promise.all(
+    store.getAll().map(async (pr) => {
+      const status = await getPullRequestStatusById(
+        pr.Organization,
+        pr.Project,
+        pr.Id,
+      );
+      if (status.ok) {
+        store.updateStatus(pr, status.value);
+      } else {
+        console.warn(
+          `Could not refresh ${pr.Repository} #${pr.Id}: ${status.error}`,
+        );
+      }
+    }),
+  );
+}
+
 async function getPullRequestStatus(
   organization: string,
   project: string,
   repositoryId: string,
   pullrequestId: string,
 ): Promise<Result<models.PullRequestStatus, string>> {
-  const url = `https://dev.azure.com/${organization}/${project}/_apis/git/repositories/${repositoryId}/pullrequests/${pullrequestId}?api-version=7.1`;
+  return fetchPullRequestStatus(
+    `https://dev.azure.com/${organization}/${project}/_apis/git/repositories/${repositoryId}/pullrequests/${pullrequestId}?api-version=7.1`,
+  );
+}
 
-  const response = await fetch(url, {
-    headers: {
-      Authorization: `Bearer ${PAT}`,
-      "Content-Type": "application/json",
-    },
-  });
+/** Project-level lookup; PR ids are unique per project, so no repository id is needed. */
+async function getPullRequestStatusById(
+  organization: string,
+  project: string,
+  pullrequestId: string,
+): Promise<Result<models.PullRequestStatus, string>> {
+  return fetchPullRequestStatus(
+    `https://dev.azure.com/${encodeURIComponent(organization)}/${encodeURIComponent(project)}/_apis/git/pullrequests/${encodeURIComponent(pullrequestId)}?api-version=7.1`,
+  );
+}
+
+async function fetchPullRequestStatus(
+  url: string,
+): Promise<Result<models.PullRequestStatus, string>> {
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${PAT}`,
+        "Content-Type": "application/json",
+      },
+    });
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
 
   if (!response.ok) {
     return {

@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { PullRequest } from "./models/pullRequest";
+import { PullRequest, PullRequestStatus } from "./models/pullRequest";
 
 type PullRequestKey = Pick<PullRequest, "Organization" | "Project" | "Repository" | "Id">;
 
@@ -35,6 +35,24 @@ export class PullRequestStore implements vscode.Disposable {
     }
     this.set(this.pullRequests.map((existing, i) => (i === index ? pr : existing)));
     return false;
+  }
+
+  /**
+   * Updates the status of a tracked pull request. Does nothing (and returns
+   * false) if it is no longer tracked or the status is unchanged, so a poll
+   * can't re-add a PR removed mid-flight or trigger needless UI refreshes.
+   */
+  updateStatus(pr: PullRequestKey, status: PullRequestStatus): boolean {
+    const existing = this.pullRequests.find((candidate) => isSamePullRequest(candidate, pr));
+    if (!existing || existing.Status === status) {
+      return false;
+    }
+    this.set(
+      this.pullRequests.map((candidate) =>
+        candidate === existing ? { ...candidate, Status: status } : candidate,
+      ),
+    );
+    return true;
   }
 
   /** Stops tracking a pull request. Returns false if it was not tracked. */
