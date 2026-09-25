@@ -12,7 +12,45 @@
   "activationEvents": [],
   "main": "./out/extension.js",
   "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "azdoMonitor",
+          "title": "AzDO Monitor",
+          "icon": "resources/azdo-monitor.svg"
+        }
+      ]
+    },
+    "views": {
+      "azdoMonitor": [
+        {
+          "id": "azdoMonitor.pullRequests",
+          "name": "Pull Requests",
+          "icon": "resources/azdo-monitor.svg"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "azdoMonitor.pullRequests",
+        "contents": "No pull requests are being tracked. Add entries to data/pullRequests.json to see them here.\n[Refresh](command:azdo-monitor.refreshPullRequests)"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "azdo-monitor.refreshPullRequests",
+          "when": "view == azdoMonitor.pullRequests",
+          "group": "navigation"
+        }
+      ]
+    },
     "commands": [
+      {
+        "command": "azdo-monitor.refreshPullRequests",
+        "title": "Refresh Pull Requests",
+        "icon": "$(refresh)"
+      },
       {
         "command": "azdo-monitor.registerPullRequest",
         "title": "Register Pull Request"
