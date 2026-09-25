@@ -14,8 +14,12 @@
   "contributes": {
     "commands": [
       {
-        "command": "azdo-monitor.helloWorld",
-        "title": "Hello World"
+        "command": "azdo-monitor.registerPullRequest",
+        "title": "Register Pull Request"
+      },
+      {
+        "command": "azdo-monitor.unregisterPullRequest",
+        "title": "Unregister Pull Request"
       }
     ]
   },

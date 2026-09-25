@@ -12,17 +12,49 @@ export function activate(context: vscode.ExtensionContext) {
   // The command has been defined in the package.json file
   // Now provide the implementation of the command with registerCommand
   // The commandId parameter must match the command field in package.json
-  const disposable = vscode.commands.registerCommand(
-    "azdo-monitor.helloWorld",
-    () => {
-      // The code you place here will be executed every time your command is executed
-      // Display a message box to the user
-      vscode.window.showInformationMessage("HelloWorld!");
+  const registerPullRequest = vscode.commands.registerCommand(
+    "azdo-monitor.registerPullRequest",
+    async () => {
+      const userInput = await vscode.window.showInputBox({
+        prompt: "Enter a value",
+        placeHolder: "Type here...",
+      });
+
+      if (userInput !== undefined) {
+        console.log("User entered:", userInput);
+      }
     },
   );
 
-  context.subscriptions.push(disposable);
+  const unregisterPullRequest = vscode.commands.registerCommand(
+    "azdo-monitor.unregisterPullRequest",
+    async () => {
+      const userInput = await vscode.window.showInputBox({
+        prompt: "Enter a value",
+        placeHolder: "Type here...",
+      });
+
+      if (userInput !== undefined) {
+        console.log("User entered:", userInput);
+      }
+    },
+  );
+
+  context.subscriptions.push(registerPullRequest, unregisterPullRequest);
 }
 
 // This method is called when your extension is deactivated
 export function deactivate() {}
+
+/*
+Pipelines:
+	- Register pipeline for monitoring
+	- Remove pipeline as being monitored
+	- Get pipeline status (Waiting, Running, Failed)
+PRs:
+	- Register PR for monitoring
+	- Remove PR as being monitored
+	- Get PR status (No review, Waiting for author, Approved, Rejected)
+	- Check for unresolved comments
+	- Check for build gates failed
+*/
