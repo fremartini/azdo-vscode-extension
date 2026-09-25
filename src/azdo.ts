@@ -1,17 +1,14 @@
-interface PullRequest {
-  Organization: string;
-  Project: string;
-  Repository: string;
-  Id: string;
-}
+import * as models from "./models/pullRequest";
+import { PullRequestStore } from "./pullRequestStore";
 
 interface Repository {
-  Id: string;
-  Name: string;
+  id: string;
+  name: string;
 }
 
 export async function registerPullRequest(
   input: string,
+  store: PullRequestStore,
 ): Promise<string | null> {
   const azDoUrl = parseAzureDevOpsPullRequestUrl(input);
 
@@ -19,7 +16,7 @@ export async function registerPullRequest(
     return "Invalid Azure DevOps format";
   }
 
-  const repositories = await getRepositories(
+  const repositories: Result<Repository[], string> = await getRepositories(
     azDoUrl.Organization,
     azDoUrl.Project,
   );
@@ -28,7 +25,7 @@ export async function registerPullRequest(
     return repositories.error;
   }
 
-  const repo = repositories.value.find((r) => r.Name === azDoUrl.Repository);
+  const repo = repositories.value.find((r) => r.name === azDoUrl.Repository);
 
   if (!repo) {
     return `could not find repository with name ${azDoUrl.Repository}`;
@@ -37,30 +34,26 @@ export async function registerPullRequest(
   const status = await getPullRequestStatus(
     azDoUrl.Organization,
     azDoUrl.Project,
-    repo.Id,
+    repo.id,
     azDoUrl.Id,
   );
 
-  console.log(status);
+  if (!status.ok) {
+    return status.error;
+  }
 
   return null;
 }
 
-// https://dev.azure.com/hmanagedcloud/AzurePlatform/_git/hmc-az-image-factory/pullrequest/15317
-
 export async function unregisterPullRequest(
   input: string,
+  store: PullRequestStore,
 ): Promise<string | null> {
   var azDoUrl = parseAzureDevOpsPullRequestUrl(input);
 
   if (azDoUrl === null) {
     return "Invalid Azure DevOps format";
   }
-
-  console.log(azDoUrl.Id);
-  console.log(azDoUrl.Organization);
-  console.log(azDoUrl.Project);
-  console.log(azDoUrl.Repository);
 
   return null;
 }
@@ -89,10 +82,12 @@ async function getRepositories(
     };
   }
 
-  return {
-    ok: true,
-    value: (await response.json()) as Repository[],
+  const repositories = (await response.json()) as {
+    count: number;
+    value: Repository[];
   };
+
+  return { ok: true, value: repositories.value };
 }
 
 async function getPullRequestStatus(
@@ -100,8 +95,8 @@ async function getPullRequestStatus(
   project: string,
   repositoryId: string,
   pullrequestId: string,
-): Promise<string | string> {
-  const url = `https://dev.azure.com/${organization}/${project}/_apis/git/${repositoryId}/pullrequests/${pullrequestId}?api-version=7.1`;
+): Promise<Result<models.PullRequest, string>> {
+  const url = `https://dev.azure.com/${organization}/${project}/_apis/git/repositories/${repositoryId}/pullrequests/${pullrequestId}?api-version=7.1`;
 
   const response = await fetch(url, {
     headers: {
@@ -111,13 +106,21 @@ async function getPullRequestStatus(
   });
 
   if (!response.ok) {
-    return response.statusText as string;
+    return {
+      ok: false,
+      error: response.statusText,
+    };
   }
 
-  return (await response.json()) as string;
+  return {
+    ok: true,
+    value: (await response.json()) as models.PullRequest,
+  };
 }
 
-function parseAzureDevOpsPullRequestUrl(url: string): PullRequest | null {
+function parseAzureDevOpsPullRequestUrl(
+  url: string,
+): models.PullRequest | null {
   const pattern =
     /^https:\/\/dev\.azure\.com\/([^/]+)\/([^/]+)\/_git\/([^/]+)\/pullrequest\/(\d+)\/?$/i;
   const match = url.match(pattern);

@@ -14,7 +14,11 @@ export class PullRequestStore implements vscode.Disposable {
   readonly onDidChange = this.changeEmitter.event;
 
   constructor(extensionUri: vscode.Uri) {
-    this.fileUri = vscode.Uri.joinPath(extensionUri, "data", "pullRequests.json");
+    this.fileUri = vscode.Uri.joinPath(
+      extensionUri,
+      "data",
+      "pullRequests.json",
+    );
     this.watcher = vscode.workspace.createFileSystemWatcher(
       new vscode.RelativePattern(extensionUri, "data/pullRequests.json"),
     );

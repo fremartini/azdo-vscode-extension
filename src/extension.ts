@@ -46,7 +46,11 @@ export async function activate(context: vscode.ExtensionContext) {
       });
 
       if (userInput !== undefined) {
-        var result = await azdo.registerPullRequest(userInput);
+        var result = await azdo.registerPullRequest(
+          userInput,
+          pullRequestStore,
+        );
+
         if (result !== null) {
           vscode.window.showInformationMessage(result);
         }
@@ -63,7 +67,11 @@ export async function activate(context: vscode.ExtensionContext) {
       });
 
       if (userInput !== undefined) {
-        var result = await azdo.unregisterPullRequest(userInput);
+        var result = await azdo.unregisterPullRequest(
+          userInput,
+          pullRequestStore,
+        );
+
         if (result !== null) {
           vscode.window.showInformationMessage(result);
         }
