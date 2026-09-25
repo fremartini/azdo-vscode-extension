@@ -1,6 +1,7 @@
 // The module 'vscode' contains the VS Code extensibility API
 // Import the module and reference it with the alias vscode in your code below
 import * as vscode from "vscode";
+import * as azdo from "./azdo";
 
 // This method is called when your extension is activated
 // Your extension is activated the very first time the command is executed
@@ -21,7 +22,10 @@ export function activate(context: vscode.ExtensionContext) {
       });
 
       if (userInput !== undefined) {
-        console.log("User entered:", userInput);
+        var result = await azdo.registerPullRequest(userInput);
+        if (result !== null) {
+          vscode.window.showInformationMessage(result);
+        }
       }
     },
   );
@@ -35,7 +39,10 @@ export function activate(context: vscode.ExtensionContext) {
       });
 
       if (userInput !== undefined) {
-        console.log("User entered:", userInput);
+        var result = await azdo.unregisterPullRequest(userInput);
+        if (result !== null) {
+          vscode.window.showInformationMessage(result);
+        }
       }
     },
   );
