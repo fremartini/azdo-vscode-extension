@@ -1,4 +1,5 @@
 import * as models from "./models/pullRequest";
+import { PollFailure, PollResult } from "./pollStatus";
 import { PullRequestStore } from "./pullRequestStore";
 
 interface Repository {
@@ -124,13 +125,16 @@ function toStatus(pr: AzdoPullRequest): models.PullRequestStatus {
 
 /**
  * Re-fetches the status of every tracked pull request and updates the store
- * (which refreshes the UI). Failures are logged and leave the old status.
+ * (which refreshes the UI). Failures leave the old status and are reported
+ * in the result.
  */
 export async function refreshPullRequestStatuses(
   store: PullRequestStore,
-): Promise<void> {
+): Promise<PollResult> {
+  const pullRequests = store.getAll();
+  const failures: PollFailure[] = [];
   await Promise.all(
-    store.getAll().map(async (pr) => {
+    pullRequests.map(async (pr) => {
       const status = await getPullRequestStatusById(
         pr.Organization,
         pr.Project,
@@ -139,12 +143,11 @@ export async function refreshPullRequestStatuses(
       if (status.ok) {
         store.updateStatus(pr, status.value);
       } else {
-        console.warn(
-          `Could not refresh ${pr.Repository} #${pr.Id}: ${status.error}`,
-        );
+        failures.push({ pr, error: status.error });
       }
     }),
   );
+  return { total: pullRequests.length, failures };
 }
 
 async function getPullRequestStatus(

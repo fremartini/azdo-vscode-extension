@@ -4,6 +4,7 @@ import {
   PullRequestStatus,
   pullRequestUrl,
 } from "../models/pullRequest";
+import { PollState, PollStatus } from "../pollStatus";
 import { PullRequestStore } from "../pullRequestStore";
 
 interface StatusStyle {
@@ -42,32 +43,70 @@ function statusStyle(pr: PullRequest): StatusStyle {
   return (pr.Status && STATUS_STYLES[pr.Status]) || DEFAULT_STYLE;
 }
 
+/** Sentinel for the poll status row pinned to the top of the tree. */
+const POLL_STATUS_NODE = { kind: "pollStatus" } as const;
+type Node = PullRequest | typeof POLL_STATUS_NODE;
+
+const POLL_STATE_STYLES: Record<PollState, StatusStyle> = {
+  Pending: { label: "Waiting for first update", icon: "history", color: "descriptionForeground" },
+  Updating: { label: "Updating…", icon: "sync~spin", color: "descriptionForeground" },
+  UpToDate: { label: "Up to date", icon: "check", color: "testing.iconPassed" },
+  PartiallyFailed: { label: "Some updates failed", icon: "warning", color: "list.warningForeground" },
+  Failed: { label: "Update failed", icon: "error", color: "testing.iconFailed" },
+  Stale: { label: "Out of date", icon: "warning", color: "list.warningForeground" },
+};
+
 export class PullRequestTreeProvider
-  implements vscode.TreeDataProvider<PullRequest>, vscode.Disposable
+  implements vscode.TreeDataProvider<Node>, vscode.Disposable
 {
   private readonly changeEmitter = new vscode.EventEmitter<void>();
-  private readonly storeSubscription: vscode.Disposable;
+  private readonly subscriptions: vscode.Disposable[];
 
   readonly onDidChangeTreeData = this.changeEmitter.event;
 
-  constructor(private readonly store: PullRequestStore) {
-    this.storeSubscription = store.onDidChange(() => this.changeEmitter.fire());
+  constructor(
+    private readonly store: PullRequestStore,
+    private readonly pollStatus: PollStatus,
+  ) {
+    this.subscriptions = [
+      store.onDidChange(() => this.changeEmitter.fire()),
+      pollStatus.onDidChange(() => this.changeEmitter.fire()),
+    ];
   }
 
-  getChildren(element?: PullRequest): PullRequest[] {
+  getChildren(element?: Node): Node[] {
     if (element) {
       return [];
     }
-    return [...this.store.getAll()].sort(
+    const pullRequests = [...this.store.getAll()].sort(
       (a, b) =>
         a.Organization.localeCompare(b.Organization) ||
         a.Project.localeCompare(b.Project) ||
         a.Repository.localeCompare(b.Repository) ||
         a.Id.localeCompare(b.Id, undefined, { numeric: true }),
     );
+    // With nothing tracked the tree stays empty so the welcome view shows.
+    return pullRequests.length ? [POLL_STATUS_NODE, ...pullRequests] : [];
   }
 
-  getTreeItem(pr: PullRequest): vscode.TreeItem {
+  getTreeItem(node: Node): vscode.TreeItem {
+    return node === POLL_STATUS_NODE
+      ? this.getPollStatusItem()
+      : this.getPullRequestItem(node as PullRequest);
+  }
+
+  private getPollStatusItem(): vscode.TreeItem {
+    const status = this.pollStatus;
+    const style = POLL_STATE_STYLES[status.state];
+    const item = new vscode.TreeItem(style.label);
+    item.iconPath = new vscode.ThemeIcon(style.icon, new vscode.ThemeColor(style.color));
+    item.description = status.lastSuccess ? formatTime(status.lastSuccess) : undefined;
+    item.tooltip = buildPollStatusTooltip(status, style);
+    item.contextValue = "pollStatus";
+    return item;
+  }
+
+  private getPullRequestItem(pr: PullRequest): vscode.TreeItem {
     const url = pullRequestUrl(pr);
     const item = new vscode.TreeItem(`${pr.Repository} #${pr.Id}`);
     item.description = `${pr.Organization} / ${pr.Project}`;
@@ -84,9 +123,44 @@ export class PullRequestTreeProvider
   }
 
   dispose(): void {
-    this.storeSubscription.dispose();
+    this.subscriptions.forEach((s) => s.dispose());
     this.changeEmitter.dispose();
   }
+}
+
+function buildPollStatusTooltip(status: PollStatus, style: StatusStyle): vscode.MarkdownString {
+  const md = new vscode.MarkdownString(undefined, true);
+  md.appendMarkdown(`$(${style.icon.replace("~spin", "")}) **${style.label}**\n\n`);
+  md.appendMarkdown(
+    `$(check) Last successful update: ${status.lastSuccess ? formatTime(status.lastSuccess, true) : "never"}\n\n`,
+  );
+  if (status.lastAttempt && status.lastAttempt !== status.lastSuccess) {
+    md.appendMarkdown(`$(history) Last attempt: ${formatTime(status.lastAttempt, true)}\n\n`);
+  }
+  if (status.state === "Stale") {
+    md.appendMarkdown(
+      `$(warning) No successful update in over ${Math.round(status.staleAfterMs / 1000)} seconds; polling may have stalled.\n\n`,
+    );
+  }
+  if (status.error) {
+    md.appendMarkdown(`$(error) ${escape(status.error)}\n\n`);
+  }
+  if (status.failures.length) {
+    md.appendMarkdown(`Could not update:\n\n`);
+    for (const { pr, error } of status.failures) {
+      md.appendMarkdown(`- ${escape(`${pr.Repository} #${pr.Id}`)}: ${escape(error)}\n`);
+    }
+    md.appendMarkdown("\n");
+  }
+  md.appendMarkdown(`_Polling every ${Math.round(status.intervalMs / 1000)} seconds_`);
+  return md;
+}
+
+/** Time of day, plus the date when it isn't today (or when `withDate` is set). */
+function formatTime(date: Date, withDate = false): string {
+  const time = date.toLocaleTimeString();
+  const isToday = date.toDateString() === new Date().toDateString();
+  return withDate || !isToday ? `${date.toLocaleDateString()} ${time}` : time;
 }
 
 function buildTooltip(

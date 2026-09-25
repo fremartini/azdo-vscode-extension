@@ -2,6 +2,7 @@
 // Import the module and reference it with the alias vscode in your code below
 import * as vscode from "vscode";
 import * as azdo from "./azdo";
+import { PollStatus } from "./pollStatus";
 import { Poller } from "./pullRequestPoller";
 import { initPullRequestStore } from "./pullRequestStore";
 import { PullRequestTreeProvider } from "./views/pullRequestTreeProvider";
@@ -12,7 +13,11 @@ const PULL_REQUEST_POLL_INTERVAL_MS = 30_000;
 // Your extension is activated the very first time the command is executed
 export async function activate(context: vscode.ExtensionContext) {
   const pullRequestStore = initPullRequestStore();
-  const pullRequestTreeProvider = new PullRequestTreeProvider(pullRequestStore);
+  const pollStatus = new PollStatus(PULL_REQUEST_POLL_INTERVAL_MS);
+  const pullRequestTreeProvider = new PullRequestTreeProvider(
+    pullRequestStore,
+    pollStatus,
+  );
   const pullRequestTreeView = vscode.window.createTreeView(
     "azdoMonitor.pullRequests",
     { treeDataProvider: pullRequestTreeProvider },
@@ -26,12 +31,13 @@ export async function activate(context: vscode.ExtensionContext) {
   pullRequestStore.onDidChange(updateBadge);
 
   const pullRequestPoller = new Poller(
-    () => azdo.refreshPullRequestStatuses(pullRequestStore),
+    () => pollStatus.track(() => azdo.refreshPullRequestStatuses(pullRequestStore)),
     PULL_REQUEST_POLL_INTERVAL_MS,
   );
 
   context.subscriptions.push(
     pullRequestStore,
+    pollStatus,
     pullRequestTreeProvider,
     pullRequestTreeView,
     pullRequestPoller,
