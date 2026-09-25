@@ -1,3 +1,4 @@
+import { getAzdoAccessToken, notSignedInMessage } from "./auth";
 import * as models from "./models/pullRequest";
 import { PollFailure, PollResult } from "./pollStatus";
 import { PullRequestStore } from "./pullRequestStore";
@@ -64,9 +65,47 @@ export async function unregisterPullRequest(
     : `${label} is not tracked`;
 }
 
-const PAT = "";
-
 type Result<T, E> = { ok: true; value: T } | { ok: false; error: E };
+
+/**
+ * GETs an Azure DevOps REST URL with an Entra ID bearer token.
+ * `interactive` allows the sign-in prompt (user-initiated actions only).
+ */
+async function azdoFetch(
+  url: string,
+  interactive: boolean,
+): Promise<Result<Response, string>> {
+  const token = await getAzdoAccessToken(interactive);
+  if (!token) {
+    return { ok: false, error: notSignedInMessage() };
+  }
+
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+    });
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+
+  // Azure DevOps answers rejected credentials with 401, or with a 203 sign-in page.
+  if (response.status === 401 || response.status === 203) {
+    return {
+      ok: false,
+      error:
+        "Access denied by Azure DevOps. Check that your account can access this organization, " +
+        "or set 'azdoMonitor.tenantId' if the organization belongs to a different tenant.",
+    };
+  }
+  if (!response.ok) {
+    return { ok: false, error: `${response.status} ${response.statusText}` };
+  }
+  return { ok: true, value: response };
+}
 
 async function getRepositories(
   organization: string,
@@ -74,21 +113,13 @@ async function getRepositories(
 ): Promise<Result<Repository[], string>> {
   const url = `https://dev.azure.com/${organization}/${project}/_apis/git/repositories?api-version=7.1`;
 
-  const response = await fetch(url, {
-    headers: {
-      Authorization: `Bearer ${PAT}`,
-      "Content-Type": "application/json",
-    },
-  });
+  const response = await azdoFetch(url, true);
 
   if (!response.ok) {
-    return {
-      ok: false,
-      error: response.statusText as string,
-    };
+    return response;
   }
 
-  const repositories = (await response.json()) as {
+  const repositories = (await response.value.json()) as {
     count: number;
     value: Repository[];
   };
@@ -158,6 +189,7 @@ async function getPullRequestStatus(
 ): Promise<Result<models.PullRequestStatus, string>> {
   return fetchPullRequestStatus(
     `https://dev.azure.com/${organization}/${project}/_apis/git/repositories/${repositoryId}/pullrequests/${pullrequestId}?api-version=7.1`,
+    true,
   );
 }
 
@@ -169,34 +201,23 @@ async function getPullRequestStatusById(
 ): Promise<Result<models.PullRequestStatus, string>> {
   return fetchPullRequestStatus(
     `https://dev.azure.com/${encodeURIComponent(organization)}/${encodeURIComponent(project)}/_apis/git/pullrequests/${encodeURIComponent(pullrequestId)}?api-version=7.1`,
+    false, // used by background polling: never prompt
   );
 }
 
 async function fetchPullRequestStatus(
   url: string,
+  interactive: boolean,
 ): Promise<Result<models.PullRequestStatus, string>> {
-  let response: Response;
-  try {
-    response = await fetch(url, {
-      headers: {
-        Authorization: `Bearer ${PAT}`,
-        "Content-Type": "application/json",
-      },
-    });
-  } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : String(err) };
-  }
+  const response = await azdoFetch(url, interactive);
 
   if (!response.ok) {
-    return {
-      ok: false,
-      error: response.statusText,
-    };
+    return response;
   }
 
   return {
     ok: true,
-    value: toStatus((await response.json()) as AzdoPullRequest),
+    value: toStatus((await response.value.json()) as AzdoPullRequest),
   };
 }
 

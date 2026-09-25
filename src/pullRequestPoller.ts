@@ -15,6 +15,11 @@ export class Poller implements vscode.Disposable {
     this.timer = setInterval(() => void this.tick(), intervalMs);
   }
 
+  /** Polls immediately (unless a poll is already running). */
+  pollNow(): Promise<void> {
+    return this.tick();
+  }
+
   private async tick(): Promise<void> {
     if (this.inFlight) {
       return;

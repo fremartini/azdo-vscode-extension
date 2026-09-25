@@ -54,8 +54,24 @@
       {
         "command": "azdo-monitor.unregisterPullRequest",
         "title": "Unregister Pull Request"
+      },
+      {
+        "command": "azdo-monitor.signIn",
+        "title": "Sign in to Azure DevOps",
+        "category": "AzDO Monitor",
+        "icon": "$(account)"
       }
-    ]
+    ],
+    "configuration": {
+      "title": "AzDO Monitor",
+      "properties": {
+        "azdoMonitor.tenantId": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Microsoft Entra tenant ID (GUID or domain, e.g. `contoso.onmicrosoft.com`) used to sign in to Azure DevOps. Leave empty to use your account's default tenant; set it when your account belongs to several tenants and the organization is not in the default one."
+        }
+      }
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",

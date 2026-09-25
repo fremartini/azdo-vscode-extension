@@ -1,6 +1,7 @@
 // The module 'vscode' contains the VS Code extensibility API
 // Import the module and reference it with the alias vscode in your code below
 import * as vscode from "vscode";
+import { getAzdoAccessToken, SIGN_IN_COMMAND } from "./auth";
 import * as azdo from "./azdo";
 import { PollStatus } from "./pollStatus";
 import { Poller } from "./pullRequestPoller";
@@ -35,12 +36,28 @@ export async function activate(context: vscode.ExtensionContext) {
     PULL_REQUEST_POLL_INTERVAL_MS,
   );
 
+  const signIn = vscode.commands.registerCommand(SIGN_IN_COMMAND, async () => {
+    if (await getAzdoAccessToken(true)) {
+      vscode.window.showInformationMessage("Signed in to Azure DevOps.");
+      await pullRequestPoller.pollNow();
+    }
+  });
+
+  // A different tenant means a different token, so re-check right away.
+  const tenantChange = vscode.workspace.onDidChangeConfiguration((e) => {
+    if (e.affectsConfiguration("azdoMonitor.tenantId")) {
+      void pullRequestPoller.pollNow();
+    }
+  });
+
   context.subscriptions.push(
     pullRequestStore,
     pollStatus,
     pullRequestTreeProvider,
     pullRequestTreeView,
     pullRequestPoller,
+    signIn,
+    tenantChange,
   );
 
   // The command has been defined in the package.json file
