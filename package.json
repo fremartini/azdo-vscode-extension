@@ -1,8 +1,9 @@
 {
   "name": "azdo-monitor",
-  "displayName": "azdo_monitor",
-  "description": "",
+  "displayName": "AzDO Monitor",
+  "description": "Track Azure DevOps pull requests and their review status from the VS Code sidebar.",
   "version": "0.0.1",
+  "publisher": "emilbille",
   "engines": {
     "vscode": "^1.138.0"
   },
@@ -79,17 +80,19 @@
     "watch": "tsc -watch -p ./",
     "pretest": "npm run compile && npm run lint",
     "lint": "eslint src",
-    "test": "vscode-test"
+    "test": "vscode-test",
+    "package": "vsce package --allow-missing-repository --skip-license"
   },
   "devDependencies": {
-    "@types/vscode": "^1.138.0",
     "@types/mocha": "^10.0.10",
     "@types/node": "24.x",
-    "typescript-eslint": "^8.61.1",
+    "@types/vscode": "^1.138.0",
+    "@vscode/test-cli": "^0.0.15",
+    "@vscode/test-electron": "^3.0.0",
+    "@vscode/vsce": "^4.0.0",
     "eslint": "^10.5.0",
     "typescript": "^6.0.3",
-    "@vscode/test-cli": "^0.0.15",
-    "@vscode/test-electron": "^3.0.0"
+    "typescript-eslint": "^8.61.1"
   },
   "overrides": {
     "diff": "^8.0.4",

@@ -1,71 +1,78 @@
-# azdo-monitor README
+# AzDO Monitor
 
-This is the README for your extension "azdo-monitor". After writing up a brief description, we recommend including the following sections.
+Keep an eye on your Azure DevOps pull requests without leaving VS Code. AzDO Monitor adds a sidebar view that lists the pull requests you track and shows each one's review status. The statuses refresh automatically every 30 seconds.
 
 ## Features
 
-Describe specific features of your extension including screenshots of your extension in action. Image paths are relative to this README file.
+- **Pull Requests view.** Select the AzDO Monitor icon in the Activity Bar to see every tracked pull request as `repository #id`, with its organization and project. A badge on the icon shows how many are tracked. Hover a pull request for details, or select it to open it in Azure DevOps.
+- **Review status at a glance.** The icon next to each pull request reflects the reviewers' votes. The most blocking vote wins:
 
-For example if there is an image subfolder under your extension project workspace:
+  | Icon | Status |
+  |---|---|
+  | Red error | Rejected |
+  | Yellow clock | Waiting for author |
+  | Green filled check | Approved |
+  | Green check | Approved with suggestions |
+  | Grey circle | No review yet |
 
-\!\[feature X\]\(images/feature-x.png\)
-
-> Tip: Many popular extensions utilize animations. This is an excellent way to show off your extension! We recommend short, focused animations that are easy to follow.
+- **Automatic refresh.** Statuses are fetched from Azure DevOps every 30 seconds.
+- **Freshness indicator.** The row at the top of the view shows whether the data is current: *Up to date*, *Updating…*, *Some updates failed*, *Update failed* or *Out of date* (no successful update for over a minute). The time of the last successful update appears next to it. Hover the row for the full timestamp and the reason for any failure.
+- **No personal access tokens.** The extension signs in with your Microsoft Entra ID account through VS Code's built-in Microsoft sign-in, so there is no secret to create or store.
 
 ## Requirements
 
-If you have any requirements or dependencies, add a section describing those and how to install and configure them.
+- VS Code 1.138 or later.
+- An Azure DevOps organization connected to Microsoft Entra ID (most work or school organizations). Organizations that use personal Microsoft accounts are not supported.
+- Read access to the repositories whose pull requests you want to track.
 
-## Extension Settings
+## Usage
 
-Include if your extension adds any VS Code settings through the `contributes.configuration` extension point.
+1. **Track a pull request.** Select **+** in the Pull Requests view (or run **Register Pull Request** from the Command Palette). Paste the pull request URL, for example:
 
-For example:
+   ```
+   https://dev.azure.com/{organization}/{project}/_git/{repository}/pullrequest/{id}
+   ```
 
-This extension contributes the following settings:
+   The first time, VS Code asks you to sign in with your Microsoft account.
+2. **Stop tracking a pull request.** Run **Unregister Pull Request** from the Command Palette and paste the same URL.
+3. **Sign in again.** If the view shows *Not signed in*, run **AzDO Monitor: Sign in to Azure DevOps**. Background refreshes never show a sign-in prompt on their own.
 
-* `myExtension.enable`: Enable/disable this extension.
-* `myExtension.thing`: Set to `blah` to do something.
+The tracked list is kept in memory, so it starts empty each time VS Code starts.
 
-## Known Issues
+## Extension settings
 
-Calling out known issues can help limit users opening duplicate issues against your extension.
+| Setting | Description |
+|---|---|
+| `azdoMonitor.tenantId` | Optional. The Microsoft Entra tenant (a GUID or a domain like `contoso.onmicrosoft.com`) to sign in to. Leave it empty to use your account's default tenant. Set it when your account belongs to several tenants and requests fail with *Access denied*. |
 
-## Release Notes
+## Build and install
 
-Users appreciate release notes as you update your extension.
+You build the extension into a `.vsix` file, which you can install or share with your team.
 
-### 1.0.0
+### Build the package
 
-Initial release of ...
+```
+npm install
+npm run package
+```
 
-### 1.0.1
+This compiles the extension and creates `azdo-monitor-<version>.vsix` in the project folder.
 
-Fixed issue #.
+### Install it
 
-### 1.1.0
+Either run:
 
-Added features X, Y, and Z.
+```
+code --install-extension azdo-monitor-0.0.1.vsix
+```
 
----
+or open the Extensions view, select **…** > **Install from VSIX…**, and pick the file. Reload VS Code afterwards.
 
-## Following extension guidelines
+To share the extension, send the `.vsix` file to colleagues and have them install it the same way. When you release a new build, increase `version` in `package.json` before packaging. To remove the extension, uninstall **AzDO Monitor** from the Extensions view.
 
-Ensure that you've read through the extensions guidelines and follow the best practices for creating your extension.
+## Development
 
-* [Extension Guidelines](https://code.visualstudio.com/api/references/extension-guidelines)
-
-## Working with Markdown
-
-You can author your README using Visual Studio Code. Here are some useful editor keyboard shortcuts:
-
-* Split the editor (`Cmd+\` on macOS or `Ctrl+\` on Windows and Linux).
-* Toggle preview (`Shift+Cmd+V` on macOS or `Shift+Ctrl+V` on Windows and Linux).
-* Press `Ctrl+Space` (Windows, Linux, macOS) to see a list of Markdown snippets.
-
-## For more information
-
-* [Visual Studio Code's Markdown Support](http://code.visualstudio.com/docs/languages/markdown)
-* [Markdown Syntax Reference](https://help.github.com/articles/markdown-basics/)
-
-**Enjoy!**
+- `npm run watch` recompiles on every change.
+- Press **F5** to launch an Extension Development Host with the extension loaded. If the host starts but the extension never activates (the log shows *Extension host did not start in 10 seconds*), the debugger failed to attach. Use **Ctrl+F5** (Run Without Debugging) instead.
+- After changing code, run **Developer: Reload Window** in the development host to pick up the new build.
+- `npm run lint` checks the code.
