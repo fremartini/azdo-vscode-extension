@@ -1,5 +1,3 @@
-// The module 'vscode' contains the VS Code extensibility API
-// Import the module and reference it with the alias vscode in your code below
 import * as vscode from "vscode";
 import { getAzdoAccessToken, SIGN_IN_COMMAND } from "./auth";
 import * as azdo from "./azdo";
@@ -7,32 +5,49 @@ import { PollStatus } from "./pollStatus";
 import { Poller } from "./pullRequestPoller";
 import { initPullRequestStore } from "./pullRequestStore";
 import { PullRequestTreeProvider } from "./views/pullRequestTreeProvider";
+import { PullRequest } from "./models/pullRequest";
 
 const PULL_REQUEST_POLL_INTERVAL_MS = 30_000;
+const SAVED_PULL_REQUEST_KEY = "trackedPullRequests";
 
-// This method is called when your extension is activated
-// Your extension is activated the very first time the command is executed
 export async function activate(context: vscode.ExtensionContext) {
-  const pullRequestStore = initPullRequestStore();
+  console.log("activating extension AzDOMonitor");
+
+  const addToStore = async (pr: PullRequest[]) =>
+    await context.globalState.update(
+      SAVED_PULL_REQUEST_KEY,
+      JSON.stringify(pr),
+    );
+  const readFromStore = () => {
+    const trackedPullRequests = context.globalState.get(SAVED_PULL_REQUEST_KEY);
+    return JSON.parse((trackedPullRequests as string) ?? "[]");
+  };
+
+  const pullRequestStore = initPullRequestStore(addToStore, readFromStore);
   const pollStatus = new PollStatus(PULL_REQUEST_POLL_INTERVAL_MS);
+
   const pullRequestTreeProvider = new PullRequestTreeProvider(
     pullRequestStore,
     pollStatus,
   );
+
   const pullRequestTreeView = vscode.window.createTreeView(
     "azdoMonitor.pullRequests",
     { treeDataProvider: pullRequestTreeProvider },
   );
+
   const updateBadge = () => {
     const count = pullRequestStore.getAll().length;
     pullRequestTreeView.badge = count
       ? { value: count, tooltip: `${count} tracked pull request(s)` }
       : undefined;
   };
+
   pullRequestStore.onDidChange(updateBadge);
 
   const pullRequestPoller = new Poller(
-    () => pollStatus.track(() => azdo.refreshPullRequestStatuses(pullRequestStore)),
+    () =>
+      pollStatus.track(() => azdo.refreshPullRequestStatuses(pullRequestStore)),
     PULL_REQUEST_POLL_INTERVAL_MS,
   );
 
@@ -106,20 +121,8 @@ export async function activate(context: vscode.ExtensionContext) {
   );
 
   context.subscriptions.push(registerPullRequest, unregisterPullRequest);
+
+  console.info("activated extension AzDOMonitor");
 }
 
-// This method is called when your extension is deactivated
 export function deactivate() {}
-
-/*
-Pipelines:
-	- Register pipeline for monitoring
-	- Remove pipeline as being monitored
-	- Get pipeline status (Waiting, Running, Failed)
-PRs:
-	- Register PR for monitoring
-	- Remove PR as being monitored
-	- Get PR status (No review, Waiting for author, Approved, Rejected)
-	- Check for unresolved comments
-	- Check for build gates failed
-*/
