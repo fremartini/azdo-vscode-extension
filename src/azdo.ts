@@ -44,7 +44,7 @@ export async function registerPullRequest(
     return status.error;
   }
 
-  const added = store.add({ ...azDoUrl, Status: status.value });
+  const added = await store.add({ ...azDoUrl, Status: status.value });
   const label = `${azDoUrl.Repository} #${azDoUrl.Id}`;
   return added ? `Now tracking ${label}` : `${label} is already tracked`;
 }
@@ -60,7 +60,7 @@ export async function unregisterPullRequest(
   }
 
   const label = `${azDoUrl.Repository} #${azDoUrl.Id}`;
-  return store.remove(azDoUrl)
+  return (await store.remove(azDoUrl))
     ? `Stopped tracking ${label}`
     : `${label} is not tracked`;
 }
@@ -89,7 +89,10 @@ async function azdoFetch(
       },
     });
   } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : String(err),
+    };
   }
 
   // Azure DevOps answers rejected credentials with 401, or with a 203 sign-in page.

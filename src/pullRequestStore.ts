@@ -1,7 +1,10 @@
 import * as vscode from "vscode";
 import { PullRequest, PullRequestStatus } from "./models/pullRequest";
 
-type PullRequestKey = Pick<PullRequest, "Organization" | "Project" | "Repository" | "Id">;
+type PullRequestKey = Pick<
+  PullRequest,
+  "Organization" | "Project" | "Repository" | "Id"
+>;
 
 /**
  * In-memory state of tracked pull requests. The tree view listens to
@@ -11,15 +14,26 @@ export class PullRequestStore implements vscode.Disposable {
   private pullRequests: PullRequest[] = [];
   private readonly changeEmitter = new vscode.EventEmitter<void>();
 
+  readonly saveToStore: (pr: PullRequest[]) => Promise<void>;
+  readonly readFromStore: () => PullRequest[];
   readonly onDidChange = this.changeEmitter.event;
+
+  constructor(
+    saveToStore: (pr: PullRequest[]) => Promise<void>,
+    readFromStore: () => PullRequest[],
+  ) {
+    this.saveToStore = saveToStore;
+    this.readFromStore = readFromStore;
+  }
 
   getAll(): readonly PullRequest[] {
     return this.pullRequests;
   }
 
   /** Replaces the tracked pull requests and refreshes the UI. */
-  set(pullRequests: readonly PullRequest[]): void {
+  async set(pullRequests: readonly PullRequest[]): Promise<void> {
     this.pullRequests = [...pullRequests];
+    await this.saveToStore(this.pullRequests);
     this.changeEmitter.fire();
   }
 
@@ -27,13 +41,20 @@ export class PullRequestStore implements vscode.Disposable {
    * Starts tracking a pull request and refreshes the UI. If it is already
    * tracked, its entry is updated (e.g. a new Status) and false is returned.
    */
-  add(pr: PullRequest): boolean {
-    const index = this.pullRequests.findIndex((existing) => isSamePullRequest(existing, pr));
+  async add(pr: PullRequest): Promise<boolean> {
+    const index = this.pullRequests.findIndex((existing) =>
+      isSamePullRequest(existing, pr),
+    );
+
     if (index === -1) {
-      this.set([...this.pullRequests, pr]);
+      await this.set([...this.pullRequests, pr]);
       return true;
     }
-    this.set(this.pullRequests.map((existing, i) => (i === index ? pr : existing)));
+
+    await this.set(
+      this.pullRequests.map((existing, i) => (i === index ? pr : existing)),
+    );
+
     return false;
   }
 
@@ -42,26 +63,39 @@ export class PullRequestStore implements vscode.Disposable {
    * false) if it is no longer tracked or the status is unchanged, so a poll
    * can't re-add a PR removed mid-flight or trigger needless UI refreshes.
    */
-  updateStatus(pr: PullRequestKey, status: PullRequestStatus): boolean {
-    const existing = this.pullRequests.find((candidate) => isSamePullRequest(candidate, pr));
+  async updateStatus(
+    pr: PullRequestKey,
+    status: PullRequestStatus,
+  ): Promise<boolean> {
+    const existing = this.pullRequests.find((candidate) =>
+      isSamePullRequest(candidate, pr),
+    );
+
     if (!existing || existing.Status === status) {
       return false;
     }
-    this.set(
+
+    await this.set(
       this.pullRequests.map((candidate) =>
         candidate === existing ? { ...candidate, Status: status } : candidate,
       ),
     );
+
     return true;
   }
 
   /** Stops tracking a pull request. Returns false if it was not tracked. */
-  remove(pr: PullRequestKey): boolean {
-    const remaining = this.pullRequests.filter((existing) => !isSamePullRequest(existing, pr));
+  async remove(pr: PullRequestKey): Promise<boolean> {
+    const remaining = this.pullRequests.filter(
+      (existing) => !isSamePullRequest(existing, pr),
+    );
+
     if (remaining.length === this.pullRequests.length) {
       return false;
     }
-    this.set(remaining);
+
+    await this.set(remaining);
+
     return true;
   }
 
@@ -73,8 +107,18 @@ export class PullRequestStore implements vscode.Disposable {
 let sharedStore: PullRequestStore | undefined;
 
 /** Creates the store the UI is bound to. Called once from `activate()`. */
-export function initPullRequestStore(): PullRequestStore {
-  sharedStore = new PullRequestStore();
+export function initPullRequestStore(
+  addToStore: (pr: PullRequest[]) => Promise<void>,
+  readFromStore: () => PullRequest[],
+): PullRequestStore {
+  sharedStore = new PullRequestStore(addToStore, readFromStore);
+
+  const existingPullRequests = readFromStore();
+
+  console.log("Existing PRs: ", existingPullRequests);
+
+  sharedStore.set(existingPullRequests);
+
   return sharedStore;
 }
 
@@ -84,8 +128,11 @@ export function initPullRequestStore(): PullRequestStore {
  */
 export function getPullRequestStore(): PullRequestStore {
   if (!sharedStore) {
-    throw new Error("PullRequestStore is not initialised; the extension has not activated yet.");
+    throw new Error(
+      "PullRequestStore is not initialised; the extension has not activated yet.",
+    );
   }
+
   return sharedStore;
 }
 
